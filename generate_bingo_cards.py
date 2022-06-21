@@ -108,8 +108,10 @@ class Card:
         print(pretty_code)
         with open('card_{:03d}.html'.format(self.id), 'w') as f:
             f.writelines(pretty_code)
-        idx = 0
-        pdfkit.from_file('card_{:03d}.html'.format(idx), 'card_{:03d}.pdf'.format(idx))
+        self.write_pdf_from_html()
+    
+    def write_pdf_from_html(self):
+        pdfkit.from_file('card_{:03d}.html'.format(card.id), 'card_{:03d}.pdf'.format(card.id))
 
     def get_fontsize_class(self,text):
         if len(text) < 20: return "large"
