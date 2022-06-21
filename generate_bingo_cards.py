@@ -1,5 +1,6 @@
 import pandas as pd
 import random, time, os, pdfkit
+from lxml import etree, html
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.platypus import SimpleDocTemplate, Paragraph, TableStyle
@@ -14,7 +15,22 @@ from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT, TA_CENTER
 from reportlab.lib import colors
 
 
+# A "TrackList" keep info on the source CSV file, and the parsed output of that file. Also provides shuffle feature
+class TrackList:
+    def __init__(self,name,filepath):
+        self.name = name
+        self.filepath = filepath
+        self.df = self.read_file()
 
+    def read_file(self):
+        return pd.read_csv('dead_or_alive_.csv')
+    def get_ArtistTrack(self):
+        return ["{} - {}".format(self.df['Track Name'][id], self.df['Artist Name(s)'][id]) for id in range(len(self.df['Track Name']))]
+    def get_suffled_ArtistTrack(self,count=0):
+        if count==0: return random.shuffle(self.get_ArtistTrack())
+        else: return random.shuffle(self.get_ArtistTrack())[:count]
+
+# A "Cell" is an individual boxe in the bingo grid
 class Cell:
     def __init__(self,id,card, label=""):
         self.id = id
@@ -29,29 +45,32 @@ class Cell:
             if self.label == track_name: 
                 self.select_cell()
                 print("Selected {} on card {} at cell {}".format(track_name,self.card.id,self.id))
-            
-
-
-
+        
+# A "Card" is All of the cells in a bingo grid as one
 class Card:
-    count = 0
+    count = 0 # used for auto assigning an ID every time a new card is made.
+    all_cards = []
     def __init__(self):
-        self.id = Card.count
-        Card.count += 1
-        self.rows = 5
-        self.cols = 5
-        self.cell_count = self.rows * self.cols
-        self.cells = [Cell(i, self) for i in range(self.cell_count)]
-        self.bingo = False
+        self.id = Card.count # assign this card's ID as however many the count is set to.
+        Card.count += 1      # then add one to the count, so the next ID is +1
+        self.rows = 5        # how many cells to have in X (rows)
+        self.cols = 5        # how many cells to have in Y (cols)
+        self.cell_count = self.rows * self.cols 
+        self.cells = [Cell(i, self) for i in range(self.cell_count)] # create a list of cells, one for each cell that is needed
+        self.bingo = False   # used to tell if this card has bingo or not
+        Card.all_cards.append(self)
     def id_to_xy(self, id):
         return (id % self.rows, id // self.rows)
+
     def xy_to_id(self,xy):
         x,y = xy
         return y * self.rows + x
+
     def set_tracks(self,track_list):
         track_list = track_list[:self.cell_count]
         for i in range(len(track_list)):
             self.cells[i].label = track_list[i]
+
     def check_bingo(self):
         if not card.bingo:
             row = []
@@ -69,9 +88,32 @@ class Card:
 
     def create_table_list(self):
         return [[self.cells[self.xy_to_id((x,y))].label for x in range(self.cols)] for y in range(self.rows)]
-    
-            
-                
+        
+    def write_html(self):
+        head = ['<link rel="stylesheet" href="styles.css">']
+        body = []
+        body.append('<div class="card">')
+        for y in range(self.rows):
+            body.append('<div class="row">')
+            for x in range(self.cols):
+                label = self.cells[self.xy_to_id((x,y))].label
+                body.append('<div class="cell {}" >{}</div>'.format(card.get_fontsize_class(label),label))
+            body.append('</div>')
+        body.append('</div>')
+        html_code = head + body
+        document_root = html.fromstring(html_code)
+        pretty_code = etree.tostring(document_root, encoding='unicode', pretty_print=True)
+        print(pretty_code)
+        with open('card_{:03d}.html'.format(self.id), 'w') as f:
+            f.writelines(pretty_code)
+        idx = 0
+        pdfkit.from_file('card_{:03d}.html'.format(idx), 'card_{:03d}.pdf'.format(idx))
+
+    def get_fontsize_class(self,text):
+        if len(text) < 20: return "large"
+        if len(text) < 30: return "medium"
+        else: return "small"
+               
     def print_cells(self):
         for y in range(self.cols):
             print("-"*self.rows*30)
@@ -86,67 +128,13 @@ class Card:
 
 
 
-def get_fontsize_class(text):
-    if len(text) < 20: return "large"
-    if len(text) < 30: return "medium"
-    else: return "small"
-    
-        
-def write_html(card):
-    css = [
-    '<style>',
-    '.small{font-size:8pt; line-height: 10pt;}',
-    '.medium{font-size:12pt; line-height: 14pt;}',
-    '.large{font-size:16pt; line-height: 18pt;}',
 
-    '.card{',
-    'border:1px solid black;',
-    '}',
-    '.row {',
-    'display: flex;',
-    'flex-wrap: nowrap;',
-    '}',
-    '.cell {',
-    "border: 1px solid black;",
-    "width: 25vw;",
-    "height: 10vw;",
-    "padding: 10px;",
-    "margin: 1px;",
-    "text-align: center;",
-    "vertical-align: middle;",
-    "align-items: center;",
-    "justify-content: center;",
-    "display: flex;",
-    "align-content: center;",
-    "flex-wrap: nowrap;",
-    "flex-direction: row;",
-    "overflow: hidden;",
-        '}',
-    '</style>',
-    ]
-    body = []
-    body.append('<div class="card">')
-    for y in range(card.rows):
-        body.append('<div class="row">')
-        for x in range(card.cols):
-            label = card.cells[card.xy_to_id((x,y))].label
-            body.append('<div class="cell {}" >{}</div>'.format(get_fontsize_class(label),label))
-        body.append('</div>')
-    body.append('</div>')
-    html_code = css + body
-    print(html_code)
-    with open('card_{:03d}.html'.format(card.id), 'w') as f:
-        f.writelines(html_code)
-    idx = 0
-    pdfkit.from_file('card_{:03d}.html'.format(idx), 'card_{:03d}.pdf'.format(idx))
+    
+  
     
 
+track_list = TrackList("Dead Or Alive","dead_or_alive_.csv")
 
-def get_track_list():
-    df = pd.read_csv('dead_or_alive_.csv')
-    return ["{} - {}".format(df['Track Name'][id], df['Artist Name(s)'][id]) for id in range(len(df['Track Name']))]
-
-track_list = get_track_list()
 num_cards = 10
 cards = []
 unique_list = []
@@ -165,22 +153,3 @@ for card_id in range(num_cards):
     cards.append(card)
 for card in cards:
     write_html(card)
-    # create_table(card, card.create_table_list())
-
-
-# game_count = 100
-# for game in range(game_count):
-#     print("Game #{}".format(game))
-#     bingo_order = track_list
-#     random.shuffle(bingo_order)
-#     bingo_after = 0
-#     for song_num, track_name in enumerate(bingo_order):
-#         print("Song number {} - {}".format(song_num,track_name))
-#         for card in cards:
-#             for cell in card.cells:
-#                 cell.check(track_name)
-#             # if card.bingo:
-#             #     bingo_after = song_num
-#             #     break
-#                     # print("{} on card {} at cell {}".format(track,card.id,cell.id))
-
