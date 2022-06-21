@@ -27,8 +27,10 @@ class TrackList:
     def get_ArtistTrack(self):
         return ["{} - {}".format(self.df['Track Name'][id], self.df['Artist Name(s)'][id]) for id in range(len(self.df['Track Name']))]
     def get_suffled_ArtistTrack(self,count=0):
-        if count==0: return random.shuffle(self.get_ArtistTrack())
-        else: return random.shuffle(self.get_ArtistTrack())[:count]
+        out_tracklist = self.get_ArtistTrack()
+        random.shuffle(out_tracklist)
+        if count==0: return out_tracklist
+        else: return out_tracklist[:count]
 
 # A "Cell" is an individual boxe in the bingo grid
 class Cell:
@@ -101,7 +103,7 @@ class Card:
             body.append('</div>')
         body.append('</div>')
         html_code = head + body
-        document_root = html.fromstring(html_code)
+        document_root = html.fromstring("".join(html_code).replace("\n",""))
         pretty_code = etree.tostring(document_root, encoding='unicode', pretty_print=True)
         print(pretty_code)
         with open('card_{:03d}.html'.format(self.id), 'w') as f:
@@ -139,7 +141,7 @@ num_cards = 10
 cards = []
 unique_list = []
 for card_id in range(num_cards):
-    this_track_list = track_list
+    this_track_list = track_list.get_suffled_ArtistTrack()
     valid = False
     while not valid:
         random.shuffle(this_track_list)
@@ -152,4 +154,4 @@ for card_id in range(num_cards):
     card.set_tracks(this_track_list)
     cards.append(card)
 for card in cards:
-    write_html(card)
+    card.write_html()
